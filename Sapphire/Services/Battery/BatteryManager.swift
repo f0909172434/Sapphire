@@ -166,7 +166,9 @@ class PowerStateController: ObservableObject {
             let currentCharge = currentSettings.useHardwareBatteryPercentage
                 ? await batteryManager.getHardwareBatteryPercentage()
                 : batteryState.level
-            let atOrAboveLimit = currentCharge >= currentSettings.batteryChargeLimit
+            // A 100% limit means "no limit": don't inhibit (in adapter mode that would cut AC power).
+            let atOrAboveLimit = currentSettings.batteryChargeLimit < 100
+                && currentCharge >= currentSettings.batteryChargeLimit
             let shouldInhibit =
                 currentSettings.stopChargingWhenSleeping
                 || atOrAboveLimit
@@ -274,6 +276,9 @@ class PowerStateController: ObservableObject {
                 currentManagementState = .inhibited
             } else if useNativeLimit {
                 if currentCharge >= currentSettings.batteryChargeLimit { currentManagementState = .inhibited }
+            } else if mode == .adapter && currentSettings.batteryChargeLimit >= 100 {
+                // A 100% limit means "no limit". In adapter mode "stop charging" cuts AC power,
+                // so reaching 100% must not take the Mac off the charger.
             } else if currentSettings.sailingModeEnabled {
                 let sailingLowerBound = currentSettings.batteryChargeLimit - currentSettings.sailingModeLowerLimit
                 if currentCharge >= currentSettings.batteryChargeLimit { shouldCharge = false; currentManagementState = .inhibited }
